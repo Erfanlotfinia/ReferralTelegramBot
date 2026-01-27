@@ -28,9 +28,9 @@ class SqlAlchemyUserRepository:
         user = User(telegram_id=telegram_id)
         self._session.add(user)
         try:
-            await self._session.flush()
+            async with self._session.begin_nested():
+                await self._session.flush()
         except IntegrityError:
-            await self._session.rollback()
             existing = await self.get_by_telegram_id(telegram_id)
             if existing:
                 return existing
