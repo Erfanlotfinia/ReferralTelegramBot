@@ -243,3 +243,164 @@ LIMIT 5;
 - Duplicate referrals prevented by `referrals.referred_telegram_id` unique constraint and idempotent API responses.
 - Self-referrals blocked at both app validation and DB check constraint.
 - Summary queries optimized with composite index for referrer and created_at ordering.
+
+---
+
+# Sprint 2 Deliverables: Clean Architecture Blueprint + Project Skeleton
+
+## Assumptions (Sprint 2)
+- Async Python stack (FastAPI + async DB driver/ORM) will be used for infrastructure.
+- Telegram bot handler will call use cases directly (or via an adapter), not via HTTP, to avoid unnecessary network hop.
+- Worker is a future component and will be introduced as a separate adapter that also calls use cases.
+- Domain entities are pure Python and contain no framework, DB, or Telegram code.
+
+## C) Clean Architecture Design (Explicit and Strict)
+
+### Layer Definitions and Responsibilities
+1) **Domain (Entities / Value Objects)**
+   - Business rules and invariants.
+   - Entities: `User`, `Referral`.
+   - Value Objects: `TelegramId` (optional), `ReferralCode` (optional).
+   - **No** DB, HTTP, or Telegram dependencies.
+
+2) **Use Cases (Interactors)**
+   - Application-specific business rules and orchestration.
+   - Implements primary use cases:
+     - `UpsertUser`
+     - `CreateReferral` (idempotent)
+     - `GetUserStatus`
+     - `GetReferralSummary`
+   - Talks only to interfaces/contracts (repositories, unit of work, clock).
+   - Returns DTOs or response models suitable for presenters.
+
+3) **Interface Adapters (Controllers / Presenters / Bot Handlers)**
+   - Translate inputs (HTTP requests, Telegram updates) into use case requests.
+   - Translate use case responses into HTTP responses or Telegram messages.
+   - Contains FastAPI routes and Telegram bot handlers (no DB access).
+
+4) **Infrastructure (DB, Telegram client, scheduler placeholder)**
+   - Concrete implementations for repositories, unit of work, and Telegram integrations.
+   - DB models / ORM mappings and migrations.
+   - Background worker scheduling (placeholder now; concrete later).
+
+### Dependency Direction Rules
+- **Inward dependencies only**: Infrastructure → Interface Adapters → Use Cases → Domain.
+- Domain has no dependencies on any outer layer.
+- Use cases depend only on abstractions; repositories are injected.
+- Interface adapters depend on use cases (not the other way around).
+- Infrastructure implements interfaces defined in use cases (or core).
+
+### Interfaces / Contracts (Minimal Signatures)
+**Repositories**
+- `UserRepository`
+  - `get_by_telegram_id(telegram_id) -> User | None`
+  - `upsert(telegram_id) -> User`
+- `ReferralRepository`
+  - `get_by_referred_telegram_id(telegram_id) -> Referral | None`
+  - `create(referrer_telegram_id, referred_telegram_id) -> Referral`
+  - `summary_for_referrer(referrer_telegram_id) -> ReferralSummary`
+
+**Unit of Work / Transaction Boundary**
+- `UnitOfWork`
+  - `users: UserRepository`
+  - `referrals: ReferralRepository`
+  - `__aenter__ / __aexit__` or `commit()` / `rollback()` for transaction control.
+
+**Optional Cross-Cutting**
+- `TelegramNotifier`
+  - `send_message(telegram_id, text) -> None` (placeholder for worker use)
+- `Clock`
+  - `now() -> datetime`
+
+### Primary Use Cases (Orchestration Rules)
+- **UpsertUser**
+  - Input: `telegram_id`.
+  - Behavior: create user if missing, return user.
+- **CreateReferral (Idempotent)**
+  - Input: `referrer_telegram_id`, `referred_telegram_id`.
+  - Rules:
+    - If `referrer_telegram_id == referred_telegram_id`: error.
+    - If referral already exists for `referred_telegram_id`:
+      - Return existing referral if same referrer.
+      - Otherwise return conflict error.
+    - Otherwise create referral (may upsert both users first).
+- **GetUserStatus**
+  - Input: `telegram_id`.
+  - Output: user + referrer (nullable).
+- **GetReferralSummary**
+  - Input: `referrer_telegram_id`.
+  - Output: count + last 5 referrals.
+
+### How FastAPI + Bot Handlers Call Use Cases
+- **FastAPI route** validates request → builds request model → calls use case → presenter returns HTTP response.
+- **Telegram bot handler** parses update → builds use case input → calls use case → formats reply.
+- Both depend on the same use case layer and do not access DB directly.
+
+---
+
+## F) Project Skeleton (Python Package Layout)
+
+```
+app/
+  core/
+    config.py             # Env + settings
+    logging.py            # Logger setup, correlation IDs
+    contracts.py          # Repository/UoW/Notifier/Clock interfaces
+  domain/
+    entities.py           # User, Referral (pure)
+    value_objects.py      # TelegramId, ReferralCode (optional)
+  usecases/
+    upsert_user.py
+    create_referral.py
+    get_user_status.py
+    get_referral_summary.py
+    dto.py                # Request/response DTOs
+  adapters/
+    api/
+      routes.py           # FastAPI endpoints, request parsing
+      presenters.py       # HTTP response formatting
+    bot/
+      handlers.py         # /start, /my_status, /ref_summary
+      presenters.py       # Telegram message formatting
+  infrastructure/
+    db/
+      models.py           # ORM models / mappings
+      repositories.py     # Repo implementations
+      uow.py              # UnitOfWork implementation
+      migrations/         # Alembic versions (or in /alembic)
+    telegram/
+      client.py           # Telegram API client wrapper
+    scheduler/
+      placeholder.py      # Worker scheduler placeholder
+  api/
+    app.py                # FastAPI app wiring
+  bot/
+    app.py                # Bot runner (polling/webhook)
+  worker/
+    app.py                # Background worker entrypoint (future)
+tests/
+  unit/
+  integration/
+alembic/
+  env.py
+  versions/
+docker-compose.yml
+```
+
+### Responsibilities (Key Modules)
+- **app/core/contracts.py**: defines `UserRepository`, `ReferralRepository`, `UnitOfWork`, `TelegramNotifier`, `Clock`.
+- **app/domain/**: domain entities + value objects only (no infra).
+- **app/usecases/**: business logic orchestrators; depend only on contracts + domain.
+- **app/adapters/api/**: FastAPI routes + presenters (HTTP boundary).
+- **app/adapters/bot/**: Telegram command handlers + presenters (bot boundary).
+- **app/infrastructure/db/**: DB models, repository implementations, UoW.
+- **app/infrastructure/telegram/**: Telegram client integration (not used in domain/usecases).
+- **app/infrastructure/scheduler/**: placeholder for worker scheduling (Sprint 5 readiness).
+- **app/api/app.py** and **app/bot/app.py**: application wiring / dependency injection.
+- **app/worker/app.py**: future worker entrypoint to call use cases for async tasks.
+
+### Separation of Concerns Check
+- Domain + use cases contain **zero** DB/Telegram code.
+- Adapters only translate input/output, not business rules.
+- Infrastructure contains all external integrations.
+- Worker can be added later as a new adapter without changing domain/use cases.
