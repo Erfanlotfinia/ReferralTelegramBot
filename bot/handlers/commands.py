@@ -53,6 +53,19 @@ def build_router(service: BotService) -> Router:
             return
 
         referrer_id, error = _parse_start_payload(message.text)
+        if error:
+            try:
+                await service.upsert_user(telegram_id)
+            except ValidationError as exc:
+                logger.warning("Validation error on /start", exc_info=exc)
+                await message.answer("Sorry, I couldn't process your request.")
+                return
+            except Exception:
+                logger.exception("Unexpected error on /start")
+                await message.answer("Sorry, something went wrong. Please try again later.")
+                return
+            await message.answer(error)
+            return
         try:
             result = await service.register_user_and_referral(telegram_id, referrer_id)
         except ValidationError as exc:
@@ -67,12 +80,6 @@ def build_router(service: BotService) -> Router:
         except Exception:
             logger.exception("Unexpected error on /start")
             await message.answer("Sorry, something went wrong. Please try again later.")
-            return
-
-        if error:
-            await message.answer(
-                "Welcome! If you meant to use a referral link, send /start ref_12345."
-            )
             return
 
         if not referrer_id:
