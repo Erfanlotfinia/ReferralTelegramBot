@@ -44,7 +44,7 @@ class PriceAlertService:
             last_sample = await self._price_samples.get_latest(self._symbol)
         except Exception:
             logger.exception("Failed to load last price sample symbol=%s", self._symbol)
-            last_sample = None
+            raise
 
         try:
             price = await self._fetcher.fetch(
@@ -60,6 +60,7 @@ class PriceAlertService:
             logger.exception(
                 "Failed to persist price sample symbol=%s price=%s", self._symbol, price
             )
+            raise
 
         change_ratio: float | None = None
         alerted = False
