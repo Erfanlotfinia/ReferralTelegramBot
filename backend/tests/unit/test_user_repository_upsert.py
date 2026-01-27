@@ -30,6 +30,7 @@ class FakeSession:
         self._after_user = after_user
         self._execute_calls = 0
         self.rolled_back = False
+        self.begin_nested_called = False
         self.added = []
 
     async def execute(self, *args, **kwargs) -> FakeResult:
@@ -43,9 +44,35 @@ class FakeSession:
     async def flush(self) -> None:
         raise IntegrityError("insert", {}, Exception("duplicate"))
 
+    def expunge(self, obj) -> None:
+        self.added.remove(obj)
+
     async def rollback(self) -> None:
         self.rolled_back = True
 
+    class _BeginNested:
+        def __init__(self, session: "FakeSession") -> None:
+            self._session = session
+
+        async def __aenter__(self) -> None:
+            self._session.begin_nested_called = True
+
+        async def __aexit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    def begin_nested(self) -> _BeginNested:
+        return self._BeginNested(self)
+
+    class _NoAutoflush:
+        def __enter__(self) -> None:
+            return None
+
+        def __exit__(self, exc_type, exc, tb) -> bool:
+            return False
+
+    @property
+    def no_autoflush(self) -> _NoAutoflush:
+        return self._NoAutoflush()
 
 @pytest.mark.asyncio
 async def test_upsert_user_handles_integrity_error() -> None:
@@ -59,4 +86,5 @@ async def test_upsert_user_handles_integrity_error() -> None:
 
     assert record.telegram_id == 42
     assert record.id == 1
-    assert session.rolled_back is True
+    assert session.begin_nested_called is True
+    assert session.rolled_back is False
