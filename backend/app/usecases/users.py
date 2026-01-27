@@ -31,4 +31,5 @@ class GetUserStatus:
             "telegram_id": telegram_id,
             "referred_by": referred.referrer_telegram_id if referred else None,
             "referral_count": referral_count,
+            "created_at": user.created_at,
         }
