@@ -21,13 +21,20 @@ def _load_bot_token() -> str:
     return token
 
 
+def _is_dry_run() -> bool:
+    return os.getenv("BOT_DRY_RUN", "0") == "1"
+
+
 async def main() -> None:
     setup_logging()
-    token = _load_bot_token()
-    bot = Bot(token=token, parse_mode=ParseMode.HTML)
     dispatcher = Dispatcher()
     service = BotService()
     dispatcher.include_router(build_router(service))
+    if _is_dry_run():
+        logger.info("BOT_DRY_RUN enabled; bot startup completed without polling.")
+        return
+    token = _load_bot_token()
+    bot = Bot(token=token, parse_mode=ParseMode.HTML)
     logger.info("Starting Telegram bot polling")
     await dispatcher.start_polling(bot)
 
