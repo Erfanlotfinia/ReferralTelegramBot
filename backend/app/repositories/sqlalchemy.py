@@ -27,7 +27,14 @@ class SqlAlchemyUserRepository:
             return existing
         user = User(telegram_id=telegram_id)
         self._session.add(user)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError:
+            await self._session.rollback()
+            existing = await self.get_by_telegram_id(telegram_id)
+            if existing:
+                return existing
+            raise
         return UserRecord(id=user.id, telegram_id=user.telegram_id, created_at=user.created_at)
 
 

@@ -45,9 +45,13 @@ async def create_referral(
     uow=Depends(get_uow),
 ):
     async with uow:
+        users_repo = SqlAlchemyUserRepository(uow.session)
+        upsert_user = UpsertUser(users_repo)
         referrals_repo = SqlAlchemyReferralRepository(uow.session)
         usecase = CreateReferral(referrals_repo)
         try:
+            await upsert_user.execute(payload.referrer_telegram_id)
+            await upsert_user.execute(payload.referred_telegram_id)
             referral, created = await usecase.execute(
                 payload.referrer_telegram_id, payload.referred_telegram_id
             )
