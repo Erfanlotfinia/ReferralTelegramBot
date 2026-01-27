@@ -20,6 +20,14 @@ class ReferralRecord:
     created_at: datetime
 
 
+@dataclass(frozen=True)
+class PriceSampleRecord:
+    id: int
+    symbol: str
+    price: float
+    created_at: datetime
+
+
 class UserRepository(Protocol):
     async def get_by_telegram_id(self, telegram_id: int) -> UserRecord | None:
         ...
@@ -43,4 +51,12 @@ class ReferralRepository(Protocol):
     async def last_referrals(
         self, referrer_telegram_id: int, limit: int = 5
     ) -> list[ReferralRecord]:
+        ...
+
+
+class PriceSampleRepository(Protocol):
+    async def get_latest(self, symbol: str) -> PriceSampleRecord | None:
+        ...
+
+    async def create(self, symbol: str, price: float) -> PriceSampleRecord:
         ...

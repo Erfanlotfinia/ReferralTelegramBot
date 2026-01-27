@@ -4,8 +4,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Referral, User
-from app.repositories.interfaces import ReferralRecord, UserRecord
+from app.db.models import PriceSample, Referral, User
+from app.repositories.interfaces import PriceSampleRecord, ReferralRecord, UserRecord
 
 
 class SqlAlchemyUserRepository:
@@ -96,3 +96,36 @@ class SqlAlchemyReferralRepository:
             )
             for referral in referrals
         ]
+
+
+class SqlAlchemyPriceSampleRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_latest(self, symbol: str) -> PriceSampleRecord | None:
+        result = await self._session.execute(
+            select(PriceSample)
+            .where(PriceSample.symbol == symbol)
+            .order_by(PriceSample.created_at.desc())
+            .limit(1)
+        )
+        sample = result.scalar_one_or_none()
+        if not sample:
+            return None
+        return PriceSampleRecord(
+            id=sample.id,
+            symbol=sample.symbol,
+            price=sample.price,
+            created_at=sample.created_at,
+        )
+
+    async def create(self, symbol: str, price: float) -> PriceSampleRecord:
+        sample = PriceSample(symbol=symbol, price=price)
+        self._session.add(sample)
+        await self._session.flush()
+        return PriceSampleRecord(
+            id=sample.id,
+            symbol=sample.symbol,
+            price=sample.price,
+            created_at=sample.created_at,
+        )
