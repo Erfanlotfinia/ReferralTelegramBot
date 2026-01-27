@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: referrals
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    working_dir: /app/backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
+      PYTHONPATH: /app/backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+
+  bot:
+    build: .
+    command: python -m bot.main
+    working_dir: /app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      PYTHONPATH: /app/backend:/app
+    depends_on:
+      - postgres
+
+  worker:
+    build: .
+    command: python -m app.worker.main
+    working_dir: /app/backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ALERT_CHAT_ID: ${TELEGRAM_ALERT_CHAT_ID}
+      PRICE_ALERT_SYMBOL: ${PRICE_ALERT_SYMBOL:-BTC-USD}
+      PRICE_ALERT_THRESHOLD: ${PRICE_ALERT_THRESHOLD:-0.01}
+      PRICE_ALERT_INTERVAL_SECONDS: ${PRICE_ALERT_INTERVAL_SECONDS:-300}
+      PRICE_ALERT_API_URL: ${PRICE_ALERT_API_URL:-https://api.coinbase.com/v2/prices/{symbol}/spot}
+      PYTHONPATH: /app/backend
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
