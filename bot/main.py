@@ -4,8 +4,16 @@ import asyncio
 import logging
 import os
 
+import sys
+from pathlib import Path
+
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+for path in (PROJECT_ROOT, PROJECT_ROOT / "backend"):
+    if path.exists():
+        sys.path.insert(0, str(path))
 
 from app.core.logging import setup_logging
 from bot.handlers import build_router
