@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres
     environment:
       POSTGRES_DB: referrals
       POSTGRES_USER: postgres
@@ -10,12 +10,18 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+        - postgres_data:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d referrals"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build: .
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     working_dir: /app/backend
+    command: sh -c "alembic -c database/alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
       PYTHONPATH: /app/backend
@@ -23,22 +29,24 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
+    restart: unless-stopped
 
   bot:
     build: .
+    working_dir: /app/backend
     command: python -m bot.main
-    working_dir: /app
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      PYTHONPATH: /app/backend:/app
+      PYTHONPATH: /app/backend
     depends_on:
       - postgres
+    restart: unless-stopped
 
   worker:
     build: .
-    command: python -m app.worker.main
     working_dir: /app/backend
+    command: python -m app.worker.main
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
@@ -50,6 +58,7 @@ services:
       PYTHONPATH: /app/backend
     depends_on:
       - postgres
+    restart: unless-stopped
 
 volumes:
   postgres_data:
