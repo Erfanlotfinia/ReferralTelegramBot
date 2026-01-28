@@ -1,6 +1,6 @@
 """add price samples and referral self-check
 
-Revision ID: 0002_add_price_samples_and_referral_checks
+Revision ID: 0002_add_price_samples_refchk
 Revises: 0001_create_users_referrals
 Create Date: 2024-01-02 00:00:00.000000
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0002_add_price_samples_and_referral_checks"
+revision = "0002_add_price_samples_refchk"
 down_revision = "0001_create_users_referrals"
 branch_labels = None
 depends_on = None
