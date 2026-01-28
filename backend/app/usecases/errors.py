@@ -11,3 +11,7 @@ class ConflictError(Exception):
 
 class NotFoundError(Exception):
     pass
+
+
+class DatabaseConnectionError(Exception):
+    pass
