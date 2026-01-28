@@ -10,3 +10,4 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY backend /app/backend
 COPY bot /app/bot
+COPY database /app/database
