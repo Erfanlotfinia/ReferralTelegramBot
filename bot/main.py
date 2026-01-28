@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -44,7 +45,10 @@ async def main() -> None:
         logger.info("BOT_DRY_RUN enabled; bot startup completed without polling.")
         return
     token = _load_bot_token()
-    bot = Bot(token=token, parse_mode=ParseMode.HTML)
+    bot = Bot(
+        token=token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     logger.info("Starting Telegram bot polling")
     await dispatcher.start_polling(bot)
 
