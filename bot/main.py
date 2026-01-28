@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import os
 from dotenv import load_dotenv
@@ -45,10 +46,11 @@ async def main() -> None:
         logger.info("BOT_DRY_RUN enabled; bot startup completed without polling.")
         return
     token = _load_bot_token()
-    bot = Bot(
-        token=token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
-    )
+    bot_defaults = DefaultBotProperties(parse_mode=ParseMode.HTML)
+    if "default" in inspect.signature(Bot.__init__).parameters:
+        bot = Bot(token=token, default=bot_defaults)
+    else:
+        bot = Bot(token=token, parse_mode=ParseMode.HTML)
     logger.info("Starting Telegram bot polling")
     await dispatcher.start_polling(bot)
 
