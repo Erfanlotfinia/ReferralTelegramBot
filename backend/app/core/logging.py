@@ -6,6 +6,7 @@ from contextvars import ContextVar
 from typing import Optional
 
 request_id_ctx_var: ContextVar[str] = ContextVar("request_id", default="-")
+_original_record_factory = logging.getLogRecordFactory()
 
 
 class RequestIdFilter(logging.Filter):
@@ -14,7 +15,15 @@ class RequestIdFilter(logging.Filter):
         return True
 
 
+def _record_factory(*args: object, **kwargs: object) -> logging.LogRecord:
+    record = _original_record_factory(*args, **kwargs)
+    if not hasattr(record, "request_id"):
+        record.request_id = request_id_ctx_var.get()
+    return record
+
+
 def setup_logging() -> None:
+    logging.setLogRecordFactory(_record_factory)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [request_id=%(request_id)s] %(name)s: %(message)s",
