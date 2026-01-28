@@ -19,7 +19,11 @@ def setup_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [request_id=%(request_id)s] %(name)s: %(message)s",
     )
-    logging.getLogger().addFilter(RequestIdFilter())
+    root_logger = logging.getLogger()
+    request_filter = RequestIdFilter()
+    root_logger.addFilter(request_filter)
+    for handler in root_logger.handlers:
+        handler.addFilter(request_filter)
 
 
 def set_request_id(value: Optional[str]) -> str:
