@@ -49,3 +49,4 @@ def downgrade() -> None:
     op.drop_index("ix_referrals_referrer", table_name="referrals")
     op.drop_table("referrals")
     op.drop_table("users")
+    op.drop_table("alembic_version")
