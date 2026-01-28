@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import logging
 
+if __package__ in (None, ""):
+    from pathlib import Path
+    import sys
+
+    sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
