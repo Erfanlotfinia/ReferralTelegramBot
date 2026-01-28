@@ -20,11 +20,11 @@ services:
 
   api:
     build: .
-    working_dir: /app/backend
+    working_dir: /app
     command: sh -c "alembic -c database/alembic.ini upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
-      PYTHONPATH: /app/backend
+      PYTHONPATH: /app:/app/backend
     ports:
       - "8000:8000"
     depends_on:
@@ -33,19 +33,19 @@ services:
 
   bot:
     build: .
-    working_dir: /app/backend
+    working_dir: /app
     command: python -m bot.main
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      PYTHONPATH: /app/backend
+      PYTHONPATH: /app:/app/backend
     depends_on:
       - postgres
     restart: unless-stopped
 
   worker:
     build: .
-    working_dir: /app/backend
+    working_dir: /app
     command: python -m app.worker.main
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/referrals
@@ -55,7 +55,7 @@ services:
       PRICE_ALERT_THRESHOLD: ${PRICE_ALERT_THRESHOLD:-0.01}
       PRICE_ALERT_INTERVAL_SECONDS: ${PRICE_ALERT_INTERVAL_SECONDS:-300}
       PRICE_ALERT_API_URL: ${PRICE_ALERT_API_URL:-https://api.coinbase.com/v2/prices/{symbol}/spot}
-      PYTHONPATH: /app/backend
+      PYTHONPATH: /app:/app/backend
     depends_on:
       - postgres
     restart: unless-stopped
